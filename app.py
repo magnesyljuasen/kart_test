@@ -41,18 +41,16 @@ def import_df(filename):
     df = pd.read_csv(filename, low_memory=False).head(5000)
     return df
 
-def main():
-    set_streamlit_settings()
+def show_all(df, selected):
     c1, c2 = st.columns([2, 1])
     with c1:
-        df = import_df(filename = "src\Bergvarme_filtered.csv")
-        df2 = import_df(filename = "src\Fjernvarme_filtered.csv")
         df['lat'] = df['SHAPE'].apply(return_lat)
         df['lng'] = df['SHAPE'].apply(return_lng)
         geometry = [Point(lon, lat) for lon, lat in zip(df['lng'], df['lat'])]
         gdf = gpd.GeoDataFrame(df, geometry=geometry, crs = "25832")
+        gdf = gdf.loc[gdf['Byggutvalgsident'] == selected]
 
-        map = folium.Map(location=[59.29028230604963, 11.118593215942385], zoom_start=15, scrollWheelZoom=True, tiles='CartoDB positron')
+        map = folium.Map(location=[63.4525759196283, 10.447553721163194], zoom_start=15, scrollWheelZoom=True, tiles='CartoDB positron', max_zoom = 22)
         
         icon_create_function = """
         function (cluster) {
@@ -65,6 +63,16 @@ def main():
             } else {
                 c += 'large';
             }
+            return new L.DivIcon({ html: '<div><span>' + childCount + '</span></div>', className: 'marker-cluster' + c, iconSize: new L.Point(40, 40) });
+            };
+        """
+        
+        icon_create_function = """
+        function (cluster) {
+            var childCount = cluster.getChildCount();
+            var c = ' marker-cluster-';
+            c += 'medium';
+
             return new L.DivIcon({ html: '<div><span>' + childCount + '</span></div>', className: 'marker-cluster' + c, iconSize: new L.Point(40, 40) });
             };
         """
@@ -97,46 +105,48 @@ def main():
     #    if st.checkbox("Tegne?"):
     #        draw = Draw()
     #        draw.add_to(map)
-        checked = st.checkbox("Vis statistikk")
-        if checked:
-            returned_objects = None
-        else:
-            returned_objects = []
-        
+
         st_map = st_folium(
             map,
-            returned_objects=returned_objects,
             use_container_width=True,
-            height=450,
+            height=600,
             )
-
-        
-        
     with c2:
-        if checked:
-            with st.expander("Returnert"):
-                st.write(st_map)
-            if st_map["zoom"] > 18:
-                st.warning("Du må zoome lenger ut")
-            else:
-                original_crs = pyproj.CRS("EPSG:4326")  # WGS84 (latitude and longitude)
-                target_crs = pyproj.CRS("EPSG:25832")
+        with st.expander("Returnert"):
+            st.write(st_map)
+        if st_map["zoom"] > 24:
+            st.warning("Du må zoome lenger ut")
+        else:
+            original_crs = pyproj.CRS("EPSG:4326")  # WGS84 (latitude and longitude)
+            target_crs = pyproj.CRS("EPSG:25832")
 
-                bounding_box = st_map["bounds"]
+            bounding_box = st_map["bounds"]
 
-                transformer = pyproj.Transformer.from_crs(original_crs, target_crs, always_xy=True)
-                min_lon, min_lat = transformer.transform(bounding_box["_southWest"]["lng"], bounding_box["_southWest"]["lat"])
-                max_lon, max_lat = transformer.transform(bounding_box["_northEast"]["lng"], bounding_box["_northEast"]["lat"])
+            transformer = pyproj.Transformer.from_crs(original_crs, target_crs, always_xy=True)
+            min_lon, min_lat = transformer.transform(bounding_box["_southWest"]["lng"], bounding_box["_southWest"]["lat"])
+            max_lon, max_lat = transformer.transform(bounding_box["_northEast"]["lng"], bounding_box["_northEast"]["lat"])
 
-                # Filter GeoDataFrame based on bounding box
-                filtered_gdf = gdf.cx[min_lon:max_lon, min_lat:max_lat]
+            # Filter GeoDataFrame based on bounding box
+            filtered_gdf = gdf.cx[min_lon:max_lon, min_lat:max_lat]
+            effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"]) * 1000), 1))
+            areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
+            energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi']*1000*1000)), 1)
+            # Print the filtered GeoDataFrame
+            st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
+            st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
+            st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " "))
+    #st.write(filtered_gdf)
 
-
-                effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"]) * 1000), 1))
-                
-                # Print the filtered GeoDataFrame
-                st.metric(label = "Areal", value = f"{round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), -3):,} m2".replace(",", " "))
-                st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
+def main():
+    set_streamlit_settings()
+    st.title("Østmarka")
+    selected = st.selectbox("Velg forslag", options = ["P3", "P2", "P1", "E"])
+    st.header("Referansesituasjon")
+    df = import_df(filename = "output\Referansesituasjon_unfiltered.csv")
+    show_all(df = df, selected=selected)
+    st.header("Bergvarme")
+    df = import_df(filename = "output\Bergvarme_unfiltered.csv")
+    show_all(df = df, selected=selected)
 
 main()
 
