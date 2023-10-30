@@ -7,6 +7,13 @@ import geopandas as gpd
 from shapely.geometry import Point
 import pyproj
 import numpy as np
+import os
+from functools import reduce
+import plotly.express as px
+import plotly.graph_objects as go
+
+
+
 
 def set_streamlit_settings():
     st.set_page_config(
@@ -36,20 +43,83 @@ def return_lat(x):
 def return_lng(x):
     return float(x.split()[1].replace(",", ""))
 
+def read_csv(folder_path = "output"):
+    csv_file_list = []
+    scenario_name_list = []
+    filename_list = []
+    for filename in os.listdir(folder_path):
+        if filename.endswith("unfiltered.csv"):
+            filename_list.append(filename)
+            scenario_name_list.append(filename.split(sep = "_")[0])
+            csv_file_list.append(filename)
+    return csv_file_list
+
 @st.cache_data
 def import_df(filename):
     df = pd.read_csv(filename, low_memory=False).head(5000)
     return df
 
-def show_all(df, selected):
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        df['lat'] = df['SHAPE'].apply(return_lat)
-        df['lng'] = df['SHAPE'].apply(return_lng)
-        geometry = [Point(lon, lat) for lon, lat in zip(df['lng'], df['lat'])]
-        gdf = gpd.GeoDataFrame(df, geometry=geometry, crs = "25832")
-        gdf = gdf.loc[gdf['Byggutvalgsident'] == selected]
+def df_to_gdf(df, selected):
+    df['lat'] = df['SHAPE'].apply(return_lat)
+    df['lng'] = df['SHAPE'].apply(return_lng)
+    geometry = [Point(lon, lat) for lon, lat in zip(df['lng'], df['lat'])]
+    gdf = gpd.GeoDataFrame(df, geometry=geometry, crs = "25832")
+    gdf = gdf.loc[gdf['Byggutvalgsident'] == selected]
+    return gdf
 
+#'_nettutveksling_vintereffekt'
+#'_nettutveksling_energi'
+def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, percentage_mode = False):
+    def reorder_dataframe(df):
+        reference_row = df[df['scenario_navn'] == 'Referansesituasjon']
+        other_rows = df[df['scenario_navn'] != 'Referansesituasjon']
+        reordered_df = pd.concat([reference_row, other_rows])
+        reordered_df.reset_index(drop=True, inplace=True)
+        return reordered_df
+    df[y_field] = df[y_field] * scaling_value
+    df = df.groupby('scenario_navn')[y_field].sum().reset_index()
+    df = reorder_dataframe(df)
+    df["prosent"] = (df[y_field] / df.iloc[0][y_field]) * 100
+    if percentage_mode == True:
+        y_field = "prosent"
+        y_max = 100
+        yaxis_title = "Prosentandel (%)"
+    fig = px.bar(df, x='scenario_navn', y=df[y_field], title = chart_title)
+    fig.update_layout(
+        margin=dict(l=0,r=0,b=0,t=50,pad=0),
+        height=300,
+        yaxis_title=yaxis_title,
+        xaxis_title="",
+        #plot_bgcolor="white",
+        legend=dict(yanchor="top", y=0.98, xanchor="left", x=0.01, bgcolor="rgba(0,0,0,0)"),
+        barmode="stack")
+
+    fig.update_xaxes(
+            ticks="outside",
+            linecolor="black",
+            gridcolor="lightgrey",
+            tickangle=90
+        )
+    fig.update_yaxes(
+        range=[0, y_max],
+        tickformat=",",
+        ticks="outside",
+        linecolor="black",
+        gridcolor="lightgrey",
+    )
+    if percentage_mode == True:
+        fig.update_layout(separators="* .*")
+    else:
+        fig.update_layout(separators="* .*")
+    st.plotly_chart(figure_or_data= fig, use_container_width=True, config = {
+        'displayModeBar': False, 
+        #'staticPlot': True
+        })
+
+def show_all(df, selected):
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        gdf = df_to_gdf(df, selected)
         map = folium.Map(location=[63.4525759196283, 10.447553721163194], zoom_start=15, scrollWheelZoom=True, tiles='CartoDB positron', max_zoom = 22)
         
         icon_create_function = """
@@ -89,9 +159,13 @@ def show_all(df, selected):
 
         def style_function(feature):
             value = feature['properties']['_nettutveksling_vintereffekt']  # Assuming the column name is 'value'
-            if (value * 1000) < 10 :
+            try:
+                value = value * 1000
+            except Exception:
+                value = 0
+            if (value) < 10 :
                 return {'color': 'green'}
-            elif (value * 1000) < 100:
+            elif (value) < 100:
                 return {'color': 'orange'}
             else:
                 return {'color': 'red'}
@@ -112,8 +186,8 @@ def show_all(df, selected):
             height=600,
             )
     with c2:
-        with st.expander("Returnert"):
-            st.write(st_map)
+#        with st.expander("Returnert"):
+#            st.write(st_map)
         if st_map["zoom"] > 24:
             st.warning("Du må zoome lenger ut")
         else:
@@ -128,25 +202,47 @@ def show_all(df, selected):
 
             # Filter GeoDataFrame based on bounding box
             filtered_gdf = gdf.cx[min_lon:max_lon, min_lat:max_lat]
-            effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"]) * 1000), 1))
+            #
+            percentage_mode = st.toggle("Prosent?")
+            plot_bar_chart(df = filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimal effekt", scaling_value = 1000, percentage_mode = percentage_mode)
+            plot_bar_chart(df = filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh]", y_field = '_nettutveksling_energi', chart_title = "Energi", scaling_value = 1000 * 1000, percentage_mode = percentage_mode)
+            effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"])), 1))
             areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
-            energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi']*1000*1000)), 1)
+            energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi'])), 1)
             # Print the filtered GeoDataFrame
-            st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
-            st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
-            st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " "))
+            #st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
+            #st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
+            #st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " "))
     #st.write(filtered_gdf)
+
+def merge_dataframes(left, right):
+    return pd.merge(left, right, on='SHAPE', how='inner')  # Replace 'common_column' with your actual common column name
 
 def main():
     set_streamlit_settings()
     st.title("Østmarka")
-    selected = st.selectbox("Velg forslag", options = ["P3", "P2", "P1", "E"])
-    st.header("Referansesituasjon")
-    df = import_df(filename = "output\Referansesituasjon_unfiltered.csv")
-    show_all(df = df, selected=selected)
-    st.header("Bergvarme")
-    df = import_df(filename = "output\Bergvarme_unfiltered.csv")
-    show_all(df = df, selected=selected)
+    selected = st.radio("Velg forslag", options = ["Eksisterende", "Alternativ 1", "Alternativ 2", "Alternativ 3"], horizontal = True)
+    if selected == "Alternativ 3":
+        selected = "P3"
+    elif selected == "Alternativ 2":
+        selected = "P2"
+    elif selected == "Alternativ 1":
+        selected = "P1"
+    elif selected == "Eksisterende":
+        selected = "E"
+    #--
+    csv_list = read_csv(folder_path = "output")
+    df_list = []
+    for i in range(0, len(csv_list)):
+        filename = str(csv_list[i])
+        df = import_df(filename = rf"output/{filename}")
+        df['scenario_navn'] = f'{filename.split("_")[0]}'
+        #columns_to_exclude = ['SHAPE', 'Byggutvalgsident']
+        #df.columns = [str(col) + f'_{filename.split("_")[0]}' if col not in columns_to_exclude else col for col in df.columns]
+        df_list.append(df)
+    merged_df = pd.concat(df_list, ignore_index=True)
+    #st.write(merged_df)
+    show_all(df = merged_df, selected=selected)
 
 main()
 
