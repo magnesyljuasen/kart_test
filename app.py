@@ -80,12 +80,16 @@ def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, 
     df = df.groupby('scenario_navn')[y_field].sum().reset_index()
     df = reorder_dataframe(df)
     df["prosent"] = (df[y_field] / df.iloc[0][y_field]) * 100
+    df["prosent"] = df["prosent"].round(0)
     if percentage_mode == True:
         y_field = "prosent"
         y_max = 100
         yaxis_title = "Prosentandel (%)"
-    fig = px.bar(df, x='scenario_navn', y=df[y_field], title = chart_title)
+    colors = ['#1d3c34', '#b7dc8f', '#FFC358', '#3498db', '#e74c3c', '#f39c12', '#9b59b6', '#2ecc71', '#34495e', '#d35400']
+
+    fig = px.bar(df, x='scenario_navn', y=df[y_field], title = chart_title, color = 'scenario_navn', color_discrete_sequence = colors)
     fig.update_layout(
+        showlegend = False,
         margin=dict(l=0,r=0,b=0,t=50,pad=0),
         height=300,
         yaxis_title=yaxis_title,
@@ -109,8 +113,12 @@ def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, 
     )
     if percentage_mode == True:
         fig.update_layout(separators="* .*")
+        fig.update_traces(
+        hovertemplate='%{y:.0f}%',  # Display percentage values with two decimal places in the tooltip
+        )
     else:
         fig.update_layout(separators="* .*")
+    
     st.plotly_chart(figure_or_data= fig, use_container_width=True, config = {
         'displayModeBar': False, 
         #'staticPlot': True
