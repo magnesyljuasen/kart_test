@@ -69,7 +69,7 @@ def df_to_gdf(df, selected):
 
 #'_nettutveksling_vintereffekt'
 #'_nettutveksling_energi'
-def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, percentage_mode = False):
+def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, percentage_mode = False, fixed_mode = True):
     def reorder_dataframe(df):
         reference_row = df[df['scenario_navn'] == 'Referansesituasjon']
         other_rows = df[df['scenario_navn'] != 'Referansesituasjon']
@@ -81,6 +81,8 @@ def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, 
     df = reorder_dataframe(df)
     df["prosent"] = (df[y_field] / df.iloc[0][y_field]) * 100
     df["prosent"] = df["prosent"].round(0)
+    if fixed_mode == True:
+        y_max = None
     if percentage_mode == True:
         y_field = "prosent"
         y_max = 100
@@ -211,7 +213,9 @@ def show_all(df, selected):
             # Filter GeoDataFrame based on bounding box
             filtered_gdf = gdf.cx[min_lon:max_lon, min_lat:max_lat]
             #
-            percentage_mode = st.toggle("Prosent?")
+           
+            percentage_mode = st.toggle("Prosent")
+            #fixed_mode = st.toggle("Fast y-akse", value = True)
             plot_bar_chart(df = filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimal effekt", scaling_value = 1000, percentage_mode = percentage_mode)
             plot_bar_chart(df = filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh]", y_field = '_nettutveksling_energi', chart_title = "Energi", scaling_value = 1000 * 1000, percentage_mode = percentage_mode)
             effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"])), 1))
