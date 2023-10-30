@@ -53,7 +53,7 @@ def read_csv(folder_path = "output"):
 
 @st.cache_data
 def import_df(filename):
-    df = pd.read_csv(filename, low_memory=False).head(5000)
+    df = pd.read_csv(filename, low_memory=False)
     return df
 
 def df_to_gdf(df, selected):
@@ -64,6 +64,9 @@ def df_to_gdf(df, selected):
     gdf = gdf.loc[gdf['Byggutvalgsident'] == selected]
     return gdf
 
+def plot_timedata(df):
+    st.write(df)
+    
 #'_nettutveksling_vintereffekt'
 #'_nettutveksling_energi'
 def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, percentage_mode = False, fixed_mode = True):
@@ -140,14 +143,19 @@ def show_all():
         #--
         csv_list, scenario_name_list = read_csv(folder_path = "output")
         df_list = []
+        df_hourly_list = []
         for i in range(0, len(csv_list)):
             filename = str(csv_list[i])
+            filename_hourly_data = f"output/{scenario_name_list[i]}_timedata.csv"
+            df_hourly_data = import_df(filename = rf"{filename_hourly_data}")
+            df_hourly_data['scenario_navn'] = f'{scenario_name_list[i]}'
+            df_hourly_list.append(df_hourly_data)
+            #--
             df = import_df(filename = rf"output/{filename}")
             df['scenario_navn'] = f'{scenario_name_list[i]}'
-            #columns_to_exclude = ['SHAPE', 'Byggutvalgsident']
-            #df.columns = [str(col) + f'_{filename.split("_")[0]}' if col not in columns_to_exclude else col for col in df.columns]
             df_list.append(df)
         df = pd.concat(df_list, ignore_index=True)
+        df_hourly_data = pd.concat(df_hourly_list, ignore_index=True)
         #--
         gdf = df_to_gdf(df, selected)
         map = folium.Map(location=[63.4525759196283, 10.447553721163194], zoom_start=13, scrollWheelZoom=True, tiles='CartoDB positron', max_zoom = 22)
@@ -249,7 +257,20 @@ def show_all():
 
             # Filter GeoDataFrame based on bounding box
             filtered_gdf = gdf.cx[min_lon:max_lon, min_lat:max_lat]
-            #
+            
+            #---
+            #---
+            unique_values = filtered_gdf["OBJECTID"].unique().tolist()
+            str_list = []
+            for i in range(0, len(unique_values)):
+                str_list.append(str(unique_values[i]))
+            #result_list = [[str_list[i], str_list[i + 1]] for i in range(0, len(str_list), 2)]
+            #st.write(result_list)
+            #st.write(unique_values)
+            #st.write(df_hourly_data)
+            df_hourly_data = df_hourly_data[["192", "193"]]
+            #---
+            #---
            
             percentage_mode = st.toggle("Prosent", help = "Viser prosentvis reduksjon fra referansesituasjonen.")
             #fixed_mode = st.toggle("Fast y-akse", value = True)
@@ -266,7 +287,7 @@ def show_all():
                 st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
                 st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " "))
             with tab4:
-                pass
+                plot_timedata(df = df_hourly_data)
             with tab5:
                 st.write("Kostnader")
                 st.write("Miljø") 
