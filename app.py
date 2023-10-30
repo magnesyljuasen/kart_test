@@ -12,12 +12,9 @@ from functools import reduce
 import plotly.express as px
 import plotly.graph_objects as go
 
-
-
-
 def set_streamlit_settings():
     st.set_page_config(
-    page_title="Test",
+    page_title="Østmarka",
     page_icon="♨️",
     layout="wide",
     initial_sidebar_state="expanded")
@@ -52,7 +49,7 @@ def read_csv(folder_path = "output"):
             filename_list.append(filename)
             scenario_name_list.append(filename.split(sep = "_")[0])
             csv_file_list.append(filename)
-    return csv_file_list
+    return csv_file_list, scenario_name_list
 
 @st.cache_data
 def import_df(filename):
@@ -87,13 +84,13 @@ def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, 
         y_field = "prosent"
         y_max = 100
         yaxis_title = "Prosentandel (%)"
-    colors = ["#1d3c34", '#334f48', '#4a625c', '#607670', '#778a85', '#8e9d99', '#a4b1ad', '#bbc4c2', '#d1d8d6', '#e8ebea']
+    colors = ["#1d3c34", '#48a23f', '#4a625c', '#341d3c', '#778a85', '#8e9d99', '#a4b1ad', '#bbc4c2', '#b7dc8f', '#FFC358']
 
-    fig = px.bar(df, x='scenario_navn', y=df[y_field], title = chart_title, color = 'scenario_navn', color_discrete_sequence = colors)
+    fig = px.bar(df, x='scenario_navn', y=df[y_field], title = f"{chart_title}", color = 'scenario_navn', color_discrete_sequence = colors)
     fig.update_layout(
         showlegend = False,
         margin=dict(l=0,r=0,b=0,t=50,pad=0),
-        height=300,
+        height=600,
         yaxis_title=yaxis_title,
         xaxis_title="",
         #plot_bgcolor="white",
@@ -126,12 +123,35 @@ def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, 
         #'staticPlot': True
         })
 
-def show_all(df, selected):
+def show_all():
+    
     c1, c2 = st.columns([1, 1])
+    
     with c1:
+        selected = st.radio("Velg bygningsmasse", options = ["Eksisterende", "Alternativ 1", "Alternativ 2", "Alternativ 3"], horizontal = True)
+        if selected == "Alternativ 3":
+            selected = "P3"
+        elif selected == "Alternativ 2":
+            selected = "P2"
+        elif selected == "Alternativ 1":
+            selected = "P1"
+        elif selected == "Eksisterende":
+            selected = "E"
+        #--
+        csv_list, scenario_name_list = read_csv(folder_path = "output")
+        df_list = []
+        for i in range(0, len(csv_list)):
+            filename = str(csv_list[i])
+            df = import_df(filename = rf"output/{filename}")
+            df['scenario_navn'] = f'{scenario_name_list[i]}'
+            #columns_to_exclude = ['SHAPE', 'Byggutvalgsident']
+            #df.columns = [str(col) + f'_{filename.split("_")[0]}' if col not in columns_to_exclude else col for col in df.columns]
+            df_list.append(df)
+        df = pd.concat(df_list, ignore_index=True)
+        #--
         gdf = df_to_gdf(df, selected)
-        map = folium.Map(location=[63.4525759196283, 10.447553721163194], zoom_start=15, scrollWheelZoom=True, tiles='CartoDB positron', max_zoom = 22)
-        
+        map = folium.Map(location=[63.4525759196283, 10.447553721163194], zoom_start=13, scrollWheelZoom=True, tiles='CartoDB positron', max_zoom = 22)
+    
         icon_create_function = """
         function (cluster) {
             var childCount = cluster.getChildCount();
@@ -164,7 +184,7 @@ def show_all(df, selected):
             icon_create_function=icon_create_function,
             options={
                 #'maxClusterRadius': 4,  # Maximum radius of the cluster in pixels
-                'disableClusteringAtZoom': 17  # Disable clustering at this zoom level and lower
+                'disableClusteringAtZoom': 20  # Disable clustering at this zoom level and lower
             }).add_to(map)
 
         def style_function(feature):
@@ -179,9 +199,25 @@ def show_all(df, selected):
                 return {'color': 'orange'}
             else:
                 return {'color': 'red'}
+            
+        def style_function(feature):
+            value = feature['properties']['_nettutveksling_energi']  # Assuming the column name is 'value'
+            try:
+                value = value * 1000
+            except Exception:
+                value = 0
+#            if (value) < 10 :
+#                return {'color': 'green'}
+#            elif (value) < 100:
+#                return {'color': 'orange'}
+#            else:
+#                return {'color': 'red'}
+            return {'color' : 'black'}
 
+        gdf1 = gdf.loc[gdf['scenario_navn'] == "Referansesituasjon"]
         # Add GeoJSON layer to the map and apply the style function
-        folium.GeoJson(gdf, name='geojson', marker=folium.CircleMarker(radius = 5), style_function=style_function).add_to(marker_cluster)
+        folium.GeoJson(gdf1, name='geojson', marker=folium.CircleMarker(radius = 5), style_function=style_function).add_to(marker_cluster)
+
 
 
         #folium.GeoJson(gdf, name='geojson', marker=folium.CircleMarker(color = "red")).add_to(marker_cluster)
@@ -195,6 +231,7 @@ def show_all(df, selected):
             use_container_width=True,
             height=600,
             )
+        st.info("Zoom inn og ut på kartet med scrollehjulet. Søylediagrammene på høyre side følger kartutsnittet.", icon = "ℹ️")
     with c2:
 #        with st.expander("Returnert"):
 #            st.write(st_map)
@@ -214,17 +251,27 @@ def show_all(df, selected):
             filtered_gdf = gdf.cx[min_lon:max_lon, min_lat:max_lat]
             #
            
-            percentage_mode = st.toggle("Prosent")
+            percentage_mode = st.toggle("Prosent", help = "Viser prosentvis reduksjon fra referansesituasjonen.")
             #fixed_mode = st.toggle("Fast y-akse", value = True)
-            plot_bar_chart(df = filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimalt behov for tilført el-effekt fra el-nettet", scaling_value = 1000, percentage_mode = percentage_mode)
-            plot_bar_chart(df = filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh]", y_field = '_nettutveksling_energi', chart_title = "Behov for tilført el-energi fra el-nettet", scaling_value = 1000 * 1000, percentage_mode = percentage_mode)
-            effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"])), 1))
-            areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
-            energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi'])), 1)
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Effekt", "Energi", "Timedata", "Varighetskurve", "Overordnet"])
+            with tab1:
+                plot_bar_chart(df = filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimalt behov for tilført el-effekt fra el-nettet", scaling_value = 1000, percentage_mode = percentage_mode)
+            with tab2:
+                plot_bar_chart(df = filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh]", y_field = '_nettutveksling_energi', chart_title = "Behov for tilført el-energi fra el-nettet", scaling_value = 1000 * 1000, percentage_mode = percentage_mode)
+            with tab3:
+                effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"])), 1))
+                areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
+                energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi'])), 1)
+                st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
+                st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
+                st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " "))
+            with tab4:
+                pass
+            with tab5:
+                st.write("Kostnader")
+                st.write("Miljø") 
             # Print the filtered GeoDataFrame
-            #st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
-            #st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
-            #st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " "))
+            
     #st.write(filtered_gdf)
 
 def merge_dataframes(left, right):
@@ -233,29 +280,10 @@ def merge_dataframes(left, right):
 def main():
     set_streamlit_settings()
     st.title("Østmarka")
-    selected = st.radio("Velg forslag", options = ["Eksisterende", "Alternativ 1", "Alternativ 2", "Alternativ 3"], horizontal = True)
-    if selected == "Alternativ 3":
-        selected = "P3"
-    elif selected == "Alternativ 2":
-        selected = "P2"
-    elif selected == "Alternativ 1":
-        selected = "P1"
-    elif selected == "Eksisterende":
-        selected = "E"
-    #--
-    csv_list = read_csv(folder_path = "output")
-    df_list = []
-    for i in range(0, len(csv_list)):
-        filename = str(csv_list[i])
-        df = import_df(filename = rf"output/{filename}")
-        df['scenario_navn'] = f'{filename.split("_")[0]}'
-        #columns_to_exclude = ['SHAPE', 'Byggutvalgsident']
-        #df.columns = [str(col) + f'_{filename.split("_")[0]}' if col not in columns_to_exclude else col for col in df.columns]
-        df_list.append(df)
-    merged_df = pd.concat(df_list, ignore_index=True)
     #st.write(merged_df)
-    show_all(df = merged_df, selected=selected)
+    show_all()
 
+    st.info("Sjekk om det er lagt inn noen regler på de store byggene")
 main()
 
     
