@@ -87,7 +87,7 @@ def plot_bar_chart(df, y_max, yaxis_title, y_field, chart_title, scaling_value, 
         y_field = "prosent"
         y_max = 100
         yaxis_title = "Prosentandel (%)"
-    colors = ['#1d3c34', '#b7dc8f', '#FFC358', '#3498db', '#e74c3c', '#f39c12', '#9b59b6', '#2ecc71', '#34495e', '#d35400']
+    colors = ["#1d3c34", '#334f48', '#4a625c', '#607670', '#778a85', '#8e9d99', '#a4b1ad', '#bbc4c2', '#d1d8d6', '#e8ebea']
 
     fig = px.bar(df, x='scenario_navn', y=df[y_field], title = chart_title, color = 'scenario_navn', color_discrete_sequence = colors)
     fig.update_layout(
@@ -216,8 +216,8 @@ def show_all(df, selected):
            
             percentage_mode = st.toggle("Prosent")
             #fixed_mode = st.toggle("Fast y-akse", value = True)
-            plot_bar_chart(df = filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimal effekt", scaling_value = 1000, percentage_mode = percentage_mode)
-            plot_bar_chart(df = filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh]", y_field = '_nettutveksling_energi', chart_title = "Energi", scaling_value = 1000 * 1000, percentage_mode = percentage_mode)
+            plot_bar_chart(df = filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimalt behov for tilført el-effekt fra el-nettet", scaling_value = 1000, percentage_mode = percentage_mode)
+            plot_bar_chart(df = filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh]", y_field = '_nettutveksling_energi', chart_title = "Behov for tilført el-energi fra el-nettet", scaling_value = 1000 * 1000, percentage_mode = percentage_mode)
             effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"])), 1))
             areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
             energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi'])), 1)
