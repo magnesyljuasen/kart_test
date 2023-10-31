@@ -438,13 +438,12 @@ def show_all():
                         energy = int(round(np.sum(df_alle_timedata[column]), -3))
                         effect = int(round(np.max(df_alle_timedata[column]), 1))
                         cost = int(round(energy * elprice))
-                        st.markdown(f"{column}".replace(",", " "))
-                        st.write(f"**{cost:,} kr**".replace(",", " "))
+                        st.metric(label = column, value = f"{cost:,} kr".replace(",", " "))
                         st.caption(f"{energy:,} kWh | {effect:,} kW".replace(",", " "))
                     i = i + 1
             with tab6:
-                areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
-                st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
+                areal = (int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])/10))
+                st.metric(label = "Areal", value = f"{areal:,} m²".replace(",", " "))
                 
                 df1 = filtered_gdf.drop(columns='geometry')
                 df1 = df1.loc[df1["scenario_navn"] == "Referansesituasjon"]
