@@ -57,16 +57,19 @@ def import_df(filename):
     df = pd.read_csv(filename, low_memory=False)
     return df
 
-def select_scenario(df, key):
+def select_scenario(df, key, varighetskurve = False):
     options = df.columns
     default_options = options.to_list()
     selected_scenarios = st.multiselect(
         "Velg scenarier", 
         options = options,
-        default = options[0],
+        default = [options[0], options[1]],
         key = key, 
         help = "Her kan du velge ett eller")
     if len(selected_scenarios) == 0:
+        st.stop()
+    elif varighetskurve == True and len(selected_scenarios) > 4:
+        st.warning("Maks 4 scenarier")
         st.stop()
     return df[selected_scenarios]
 
@@ -101,7 +104,7 @@ def plot_timedata(df, color_sequence, y_min = 0, y_max = None):
         y_max = y_old_max * 1.1
 
         fig.update_layout(
-            height=700, 
+            height=600, 
             showlegend=False,
             margin=dict(l=50,r=50,b=10,t=10,pad=0)
             )
@@ -356,8 +359,6 @@ def show_all():
             )
         st.info("Zoom inn og ut på kartet med scrollehjulet. Søylediagrammene på høyre side følger kartutsnittet.", icon = "ℹ️")
     with c2:
-#        with st.expander("Returnert"):
-#            st.write(st_map)
         if st_map["zoom"] > 24:
             st.warning("Du må zoome lenger ut")
         else:
@@ -391,7 +392,6 @@ def show_all():
             percentage_mode = st.toggle("Prosent", help = "Viser prosentvis reduksjon fra referansesituasjonen.")
             #fixed_mode = st.toggle("Fast y-akse", value = True)
             #--
-            colors = ["#1d3c34", '#48a23f', '#4a625c', '#341d3c', '#778a85', '#8e9d99', '#a4b1ad', '#bbc4c2', '#b7dc8f', '#FFC358']
             color_sequence = [
                 "#c76900", #bergvarme
                 "#48a23f", #bergvarmesolfjernvarme
@@ -405,35 +405,53 @@ def show_all():
                 "#ffc358", #solceller
             ]
             #--
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Effekt", "Energi", "Timedata", "Varighetskurve", "Overordnet"])
+            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Effekt", "Energi", "Timedata", "Varighetskurve", "Kostnader"])
             with tab1:
                 plot_bar_chart(df = filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimalt behov for tilført el-effekt fra el-nettet", scaling_value = 1000, color_sequence=color_sequence, percentage_mode = percentage_mode)
             with tab2:
                 plot_bar_chart(df = filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh]", y_field = '_nettutveksling_energi', chart_title = "Behov for tilført el-energi fra el-nettet", scaling_value = 1000 * 1000, color_sequence=color_sequence, percentage_mode = percentage_mode)
             with tab3:
                 df_varighet = df_timedata.copy()
-                df_timedata = select_scenario(df = df_timedata, key = "timedata")
+                df_alle_timedata = df_timedata.copy()
+                df_timedata = select_scenario(df = df_timedata, key = "timedata", varighetskurve = False)
                 fig = plot_timedata(df = df_timedata, color_sequence = color_sequence, y_min = 0, y_max = None)
                 st.plotly_chart(figure_or_data = fig, use_container_width = True, config = {'displayModeBar': False})
             with tab4:
-                df_varighet = select_scenario(df = df_varighet, key = "varighet")
+                df_varighet = select_scenario(df = df_varighet, key = "varighet", varighetskurve = False)
                 fig = plot_varighetskurve(df = df_varighet, color_sequence = color_sequence, y_min = 0, y_max = None)
                 st.plotly_chart(figure_or_data = fig, use_container_width = True, config = {'displayModeBar': False})
                 #---
                 #---
                 
             with tab5:
-                st.write("Kostnader")
-                st.write("Miljø")
-                effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"])), 1))
-                areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
-                energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi'])), 1)
-                st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
-                st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
-                st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " ")) 
+                i = 0
+                elprice = st.number_input("Strømpris [kr/kWh]", value = 1.1, step = 0.1)
+                for column in df_alle_timedata.columns:
+                    if (i % 2):
+                        col = c1
+                    else:
+                        c1, c2 = st.columns(2)
+                        col = c2
+                    with col:
+                        energy = int(round(np.sum(df_alle_timedata[column]), -3))
+                        effect = int(round(np.max(df_alle_timedata[column]), 1))
+                        cost = int(round(energy * elprice))
+                        st.markdown(f"{column}".replace(",", " "))
+                        st.write(f"**{cost:,} kr**".replace(",", " "))
+                        st.caption(f"{energy:,} kWh | {effect:,} kW".replace(",", " "))
+                    i = i + 1
+                    
+                #effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"])), 1))
+                #areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
+                #energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi'])), 1)
+                #st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
+                #st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
+                #st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " ")) 
             # Print the filtered GeoDataFrame
             
     #st.write(filtered_gdf)
+    with st.expander("Returnert"):
+        st.write(st_map)
 
 def merge_dataframes(left, right):
     return pd.merge(left, right, on='SHAPE', how='inner')  # Replace 'common_column' with your actual common column name
@@ -444,7 +462,7 @@ def main():
     #st.write(merged_df)
     show_all()
 
-    st.info("Sjekk om det er lagt inn noen regler på de store byggene")
+    #st.info("Sjekk om det er lagt inn noen regler på de store byggene")
 main()
 
     
