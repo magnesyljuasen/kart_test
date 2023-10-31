@@ -395,6 +395,7 @@ def show_all():
                 df_timedata[scenario_name] = df_tiltak.sum(axis=1)
 
             percentage_mode = st.toggle("Prosent", help = "Viser prosentvis reduksjon fra referansesituasjonen.")
+            st.warning("Se bort ifra solcelleberegningen på NGU, Ringve og Østmarka sykehus")
             #fixed_mode = st.toggle("Fast y-akse", value = True)
             #--
             color_sequence = [
