@@ -249,6 +249,7 @@ def show_all():
     c1, c2 = st.columns([1, 1])
     
     with c1:
+        markercluster = st.toggle("Clustering", value = True)
         selected = st.radio("Velg bygningsmasse", options = ["Eksisterende", "Alternativ 1", "Alternativ 2", "Alternativ 3"], horizontal = True)
         if selected == "Alternativ 3":
             selected = "P3"
@@ -342,7 +343,11 @@ def show_all():
 
         gdf1 = gdf.loc[gdf['scenario_navn'] == "Referansesituasjon"]
         # Add GeoJSON layer to the map and apply the style function
-        folium.GeoJson(gdf1, name='geojson', marker=folium.CircleMarker(radius = 5), style_function=style_function).add_to(marker_cluster)
+        if markercluster == True:
+            folium.GeoJson(gdf1, name='geojson', marker=folium.CircleMarker(radius = 5), style_function=style_function).add_to(marker_cluster)
+        else:
+            folium.GeoJson(gdf1, name='geojson', marker=folium.CircleMarker(radius = 5), style_function=style_function).add_to(map)
+        
 
 
 
