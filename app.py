@@ -405,7 +405,7 @@ def show_all():
                 "#ffc358", #solceller
             ]
             #--
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Effekt", "Energi", "Timedata", "Varighetskurve", "Kostnader"])
+            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Effekt", "Energi", "Timedata", "Varighetskurve", "Driftskostnader", "Bygningsinformasjon"])
             with tab1:
                 plot_bar_chart(df = filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimalt behov for tilført el-effekt fra el-nettet", scaling_value = 1000, color_sequence=color_sequence, percentage_mode = percentage_mode)
             with tab2:
@@ -420,9 +420,6 @@ def show_all():
                 df_varighet = select_scenario(df = df_varighet, key = "varighet", varighetskurve = False)
                 fig = plot_varighetskurve(df = df_varighet, color_sequence = color_sequence, y_min = 0, y_max = None)
                 st.plotly_chart(figure_or_data = fig, use_container_width = True, config = {'displayModeBar': False})
-                #---
-                #---
-                
             with tab5:
                 i = 0
                 elprice = st.number_input("Strømpris [kr/kWh]", value = 1.1, step = 0.1)
@@ -440,16 +437,32 @@ def show_all():
                         st.write(f"**{cost:,} kr**".replace(",", " "))
                         st.caption(f"{energy:,} kWh | {effect:,} kW".replace(",", " "))
                     i = i + 1
-                    
-                #effekt = (round(int(np.sum(filtered_gdf["_nettutveksling_vintereffekt"])), 1))
-                #areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
-                #energi = round(int(np.sum(filtered_gdf['_nettutveksling_energi'])), 1)
-                #st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
-                #st.metric(label = "Effekt", value = f"{effekt:,} kW".replace(",", " "))
-                #st.metric(label = "Energi", value = f"{energi:,} kWh".replace(",", " ")) 
-            # Print the filtered GeoDataFrame
-            
-    #st.write(filtered_gdf)
+            with tab6:
+                areal = round(int(np.sum(filtered_gdf['BRUKSAREAL_TOTALT'])), 1)
+                st.metric(label = "Areal", value = f"{areal:,} m2".replace(",", " "))
+                
+                df1 = filtered_gdf.drop(columns='geometry')
+                df1 = df1.loc[df1["scenario_navn"] == "Referansesituasjon"]
+                pie_fig = px.pie(data_frame=df1, names = 'BYGNINGSTYPE_NAVN')
+                # Customize the layout for the pie chart
+                pie_fig.update_layout(
+                    showlegend = False,
+                    #legend=dict(orientation="h"),
+                    autosize=False,
+                    margin=dict(l=0, r=0, b=0, t=0, pad=0),
+                    #plot_bgcolor="white",
+                    #legend=dict(yanchor="top", y=0.98, xanchor="left", x=0.01, bgcolor="rgba(0,0,0,0)"),
+                )
+                pie_fig.update_traces(
+                    hoverinfo='label+percent+name', 
+                    #textinfo = "none"
+                    )
+                #pie_fig.update(layout_title_text='Van Gogh: 5 Most Prominent Colors Shown Proportionally', layout_showlegend=False)
+
+                # Assuming you are using Streamlit to display the chart
+                st.plotly_chart(pie_fig, use_container_width=True, config={'displayModeBar': False})
+                with st.expander("Alle data"):
+                    st.dataframe(df1)
     with st.expander("Returnert"):
         st.write(st_map)
 
