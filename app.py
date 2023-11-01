@@ -12,6 +12,7 @@ from functools import reduce
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from folium.plugins import Fullscreen, minimap
 
 @st.cache_data
 def import_df(filename):
@@ -269,7 +270,7 @@ class Dashboard:
 #            else:
 #                return {'color': 'red'}
             return {'color' : 'black'}
-        map = folium.Map(location=[63.4525759196283, 10.447553721163194], zoom_start=13, scrollWheelZoom=True, tiles='CartoDB positron', max_zoom = 22)
+        map = folium.Map(location=[63.4525759196283, 10.447553721163194], zoom_start=13, scrollWheelZoom=True, tiles='CartoDB positron', max_zoom = 22, control_scale=True)
         icon_create_function = """
         function (cluster) {
             var childCount = cluster.getChildCount();
@@ -318,6 +319,7 @@ class Dashboard:
                 #marker=folium.CircleMarker(radius = 3), 
                 #style_function=style_function
                 ).add_to(map)
+        Fullscreen().add_to(map)
         self.st_map = st_folium(
             map,
             use_container_width=True,
