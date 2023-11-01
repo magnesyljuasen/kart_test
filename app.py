@@ -20,8 +20,8 @@ def import_df(filename):
 
 class Dashboard:
     def __init__(self):
-        self.title = "Østmarka"
-        self.icon = "♨️"
+        self.title = "Energianalyse Østmarka"
+        self.icon = "🖥️"
         self.color_sequence = [
             "#c76900", #bergvarme
             "#48a23f", #bergvarmesolfjernvarme
@@ -424,6 +424,7 @@ class Dashboard:
     def main(self):
         self.set_streamlit_settings()
         self.adjust_input_parameters_before()
+        st.warning("Under arbeid")
         st.title("Østmarka")
         c1, c2 = st.columns([1, 1])
         with c1:
