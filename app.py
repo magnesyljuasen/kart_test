@@ -424,7 +424,6 @@ class Dashboard:
     def main(self):
         self.set_streamlit_settings()
         self.adjust_input_parameters_before()
-        st.warning("Under arbeid")
         st.title("Østmarka")
         c1, c2 = st.columns([1, 1])
         with c1:
