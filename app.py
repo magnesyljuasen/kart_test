@@ -39,8 +39,7 @@ class Dashboard:
         st.set_page_config(
         page_title=self.title,
         page_icon=self.icon,
-        layout="wide",
-        initial_sidebar_state="expanded")
+        layout="wide",)
         
         with open("src/styles/main.css") as f:
             st.markdown("<style>{}</style>".format(f.read()), unsafe_allow_html=True)
@@ -239,12 +238,12 @@ class Dashboard:
     
     def adjust_input_parameters_before(self):
         with st.sidebar:
-            selected_buildings_option = st.selectbox("Velg bygningsmasse", options = ["Eksisterende", "Alternativ 1", "Alternativ 2", "Alternativ 3"])
+            selected_buildings_option = st.selectbox("Velg bygningsmasse", options = ["Eksisterende bygningsmasse", "Planforslag (inkl. dagens bygg som skal bevares)", "Planforslag (ekskl. helsebygg)", "Planforslag og områdene rundt Østmarka"])
             selected_buildings_option_map = {
-                "Eksisterende" : "P3",
-                "Alternativ 1" : "P1",
-                "Alternativ 2" : "P2",
-                "Alternativ 3" : "P3"
+                "Eksisterende bygningsmasse" : "E",
+                "Planforslag (inkl. dagens bygg som skal bevares)" : "P1",
+                "Planforslag (ekskl. helsebygg)" : "P2",
+                "Planforslag og områdene rundt Østmarka" : "P3"
             }
             self.selected_buildings_option = selected_buildings_option_map[selected_buildings_option]
             self.marker_cluster_option = st.toggle("Clustering", value = True)
@@ -399,19 +398,19 @@ class Dashboard:
                 energy = int(round(np.sum(self.df_timedata[column]), -3))
                 effect = int(round(np.max(self.df_timedata[column]), 1))
                 cost = int(round(energy * self.elprice))
-                st.metric(label = column, value = f"{cost:,} kr".replace(",", " "))
-                st.caption(f"{energy:,} kWh | {effect:,} kW".replace(",", " "))
+                st.metric(label = column, value = f"{cost:,} kr/år".replace(",", " "))
+                st.caption(f"{energy:,} kWh/år | {effect:,} kW".replace(",", " "))
             i = i + 1
             
     def tabs(self):
         if (len(self.filtered_gdf)) == 0:
             st.warning('Du er utenfor kartutsnittet', icon="⚠️")
             st.stop()
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Effekt", "Energi", "Timedata", "Varighetskurve", "Driftskostnader", "Bygningsinformasjon"])
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Effekt", "Energi", "Timedata", "Varighetskurve", "Strømkostnader", "Bygningsinformasjon"])
         with tab1:
             self.plot_bar_chart(df = self.filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimalt behov for tilført el-effekt fra el-nettet", scaling_value = 1000, color_sequence=self.color_sequence, percentage_mode = self.percentage_mode_option)
         with tab2:
-            self.plot_bar_chart(df = self.filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh]", y_field = '_nettutveksling_energi', chart_title = "Behov for tilført el-energi fra el-nettet", scaling_value = 1000 * 1000, color_sequence=self.color_sequence, percentage_mode = self.percentage_mode_option)
+            self.plot_bar_chart(df = self.filtered_gdf, y_max = 16000000, yaxis_title = "Energi [kWh/år]", y_field = '_nettutveksling_energi', chart_title = "Behov for tilført el-energi fra el-nettet", scaling_value = 1000 * 1000, color_sequence=self.color_sequence, percentage_mode = self.percentage_mode_option)
         with tab3:
             self.plot_timedata(df = self.df_timedata, color_sequence = self.color_sequence, y_min = 0, y_max = None)
         with tab4:
