@@ -80,7 +80,7 @@ class Dashboard:
         self.selected_scenarios = st.multiselect(
             "Velg scenarier", 
             options = options,
-            default = [options[8], options[0]],
+            default = [options[-1], options[0]],
             help = "Her kan du velge ett eller")
         if len(self.selected_scenarios) == 0:
             self.selected_scenarios = ["Referansesituasjon"]
@@ -358,13 +358,15 @@ class Dashboard:
             self.df_timedata = df_timedata
             
     def building_data(self):
-        areal = (int(np.sum(self.filtered_gdf['BRUKSAREAL_TOTALT'])/10))
+        selected_gdf = self.filtered_gdf.loc[self.filtered_gdf["scenario_navn"] == "Referansesituasjon"]
+        areal = (int(np.sum(selected_gdf['BRUKSAREAL_TOTALT'])))
         st.metric(label = "Areal", value = f"{areal:,} m²".replace(",", " "))
-        electric_demand = (int(np.sum(self.filtered_gdf['_elspesifikt_energibehov_sum'])*1000 * 100))
-        st.metric(label = "Elspesifikt behov", value = f"{electric_demand:,} kWh".replace(",", " "))
-        space_heating_demand = (int(np.sum(self.filtered_gdf['_termisk_energibehov_sum'])*1000 * 100))
-        st.metric(label = "Oppvarmingsbehov", value = f"{space_heating_demand:,} kWh".replace(",", " "))
-    
+        electric_demand = (int(np.sum(selected_gdf['_elspesifikt_energibehov_sum'])*1000 * 1000))
+        st.metric(label = "Elspesifikt behov", value = f"{round(electric_demand, -3):,} kWh".replace(",", " "))
+        space_heating_demand = (int(np.sum(selected_gdf['_termisk_energibehov_sum'])*1000 * 1000))
+        st.metric(label = "Oppvarmingsbehov", value = f"{round(space_heating_demand, -3):,} kWh".replace(",", " "))
+        total_demand = space_heating_demand + electric_demand
+        st.metric(label = "Totalt", value = f"{round(total_demand, -3):,} kWh".replace(",", " "))
         df = self.filtered_gdf.drop(columns='geometry')
         df = df.loc[df["scenario_navn"] == "Referansesituasjon"]
         pie_fig = px.pie(data_frame=df, names = 'BYGNINGSTYPE_NAVN')
@@ -402,6 +404,9 @@ class Dashboard:
             i = i + 1
             
     def tabs(self):
+        if (len(self.filtered_gdf)) == 0:
+            st.warning('Du er utenfor kartutsnittet', icon="⚠️")
+            st.stop()
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Effekt", "Energi", "Timedata", "Varighetskurve", "Driftskostnader", "Bygningsinformasjon"])
         with tab1:
             self.plot_bar_chart(df = self.filtered_gdf, y_max = 4500, yaxis_title = "Effekt [kW]", y_field = '_nettutveksling_vintereffekt', chart_title = "Maksimalt behov for tilført el-effekt fra el-nettet", scaling_value = 1000, color_sequence=self.color_sequence, percentage_mode = self.percentage_mode_option)
@@ -431,7 +436,6 @@ class Dashboard:
             else:
                 self.gdf_filtering()
                 self.adjust_input_parameters_after()
-                st.warning("Se bort ifra solcelleberegningen på NGU, Ringve og Østmarka sykehus")
                 self.tabs()
         with st.expander("Returnert"):
             st.write(self.st_map)
