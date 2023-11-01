@@ -305,9 +305,19 @@ class Dashboard:
 
         gdf1 = gdf.loc[gdf['scenario_navn'] == "Referansesituasjon"]
         if self.marker_cluster_option == True:
-            folium.GeoJson(gdf1, name='geojson', marker=folium.CircleMarker(radius = 5), style_function=style_function).add_to(marker_cluster)
+            folium.GeoJson(
+                gdf1, 
+                name='geojson', 
+                #marker=folium.CircleMarker(radius = 3), 
+                #style_function=style_function
+                ).add_to(marker_cluster)
         else:
-            folium.GeoJson(gdf1, name='geojson', marker=folium.CircleMarker(radius = 5), style_function=style_function).add_to(map)
+            folium.GeoJson(
+                gdf1, 
+                name='geojson', 
+                #marker=folium.CircleMarker(radius = 3), 
+                #style_function=style_function
+                ).add_to(map)
         self.st_map = st_folium(
             map,
             use_container_width=True,
